@@ -1,0 +1,52 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+* { margin:0; padding:0; box-sizing:border-box; font-family:'Inter',sans-serif; }
+body { background:#0b0e14; color:#e0e4ef; min-height:100vh; }
+.app { display:flex; min-height:100vh; }
+.sidebar { width:260px; background:#131a24; border-right:1px solid #1f2a36; padding:24px 16px; display:flex; flex-direction:column; gap:32px; flex-shrink:0; position:sticky; top:0; height:100vh; }
+.logo { display:flex; align-items:center; gap:12px; }
+.logo .material-icons { color:#5b9aff; font-size:32px; }
+.logo h2 { font-size:20px; }
+.logo h2 span { color:#5b9aff; }
+nav ul { list-style:none; display:flex; flex-direction:column; gap:4px; }
+nav ul li { padding:12px 16px; border-radius:10px; display:flex; align-items:center; gap:14px; cursor:pointer; transition:0.2s; color:#8896a6; }
+nav ul li:hover { background:#1f2a36; color:#fff; }
+nav ul li.active { background:#1f2a36; color:#5b9aff; }
+nav ul li .material-icons { font-size:22px; }
+.status-box { margin-top:auto; background:#0f161e; padding:16px; border-radius:12px; display:flex; align-items:center; gap:12px; }
+.status-indicator { width:12px; height:12px; border-radius:50%; background:#4caf50; transition:0.3s; }
+.status-indicator.off { background:#f44336; }
+.main { flex:1; padding:30px 40px; overflow-y:auto; background:#0f161e; }
+header { display:flex; justify-content:space-between; align-items:center; margin-bottom:30px; }
+header h1 { font-size:26px; font-weight:600; }
+#deviceInfo { background:#1f2a36; padding:6px 18px; border-radius:20px; font-size:14px; }
+.card { background:#131a24; border-radius:16px; padding:24px; margin-bottom:28px; border:1px solid #1f2a36; }
+.card h3 { display:flex; align-items:center; gap:10px; font-size:18px; margin-bottom:18px; color:#c8d0dc; }
+.card h3 .material-icons { color:#5b9aff; }
+.btn-group { display:flex; gap:10px; flex-wrap:wrap; margin-top:12px; }
+.btn { padding:10px 24px; border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer; transition:0.2s; display:inline-flex; align-items:center; gap:8px; }
+.btn.primary { background:#5b9aff; color:#fff; }
+.btn.primary:hover { background:#4a8aee; }
+.btn.primary:disabled { opacity:0.5; cursor:not-allowed; }
+.btn.secondary { background:#1f2a36; color:#e0e4ef; }
+.btn.secondary:hover { background:#2a3a4a; }
+.btn.success { background:#2b8a3e; color:#fff; }
+.btn.success:hover { background:#237a34; }
+.btn.danger { background:#c92a2a; color:#fff; }
+.btn.danger:hover { background:#a51e1e; }
+.hint { margin-top:12px; font-size:13px; color:#8896a6; }
+.device-status { margin-top:12px; padding:12px; background:#0f161e; border-radius:8px; display:flex; align-items:center; gap:10px; font-size:13px; color:#8896a6; }
+.payload-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:12px; max-height:500px; overflow-y:auto; }
+.payload-card { background:#0f161e; padding:14px 12px; border-radius:10px; cursor:pointer; border:1px solid transparent; transition:0.2s; }
+.payload-card:hover { border-color:#5b9aff; transform:translateY(-2px); background:#1a2532; }
+.payload-card .material-icons { font-size:22px; color:#5b9aff; margin-bottom:4px; }
+.payload-card p { font-weight:600; font-size:13px; margin-bottom:2px; }
+.payload-card small { color:#8896a6; font-size:11px; display:block; }
+.payload-card .badge { font-size:10px; background:#1f2a36; padding:2px 8px; border-radius:10px; display:inline-block; margin-top:4px; }
+#scriptEditor { width:100%; background:#0a0e14; color:#b0c4d9; border:1px solid #1f2a36; border-radius:8px; padding:14px; font-family:'Courier New',monospace; font-size:13px; line-height:1.6; resize:vertical; }
+#scriptEditor:focus { outline:none; border-color:#5b9aff; }
+.console-box { background:#0a0e14; border-radius:10px; padding:14px; height:200px; overflow-y:auto; font-family:'Courier New',monospace; font-size:13px; line-height:1.7; color:#b0c4d9; }
+.console-box .log-line { border-bottom:1px solid #1a2532; padding:2px 0; }
+.console-box .log-line.error { color:#ff6b6b; }
+.console-box .log-line.success { color:#69db7c; }
+.console-box .log-line.warning { color:#fcc419; }
+@media (max-width:768px){ .sidebar{display:none;} .main{padding:20px;} }
