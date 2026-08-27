@@ -1,13 +1,12 @@
 {
-  "name": "usb-hid-neon",
+  "name": "hidneon",
   "version": 2,
   "builds": [
     { "src": "api/index.py", "use": "@vercel/python" },
-    { "src": "static/**", "use": "@vercel/static" },
-    { "src": "templates/**", "use": "@vercel/static" }
+    { "src": "index.html", "use": "@vercel/static" }
   ],
   "routes": [
     { "src": "/api/(.*)", "dest": "api/index.py" },
-    { "src": "/(.*)", "dest": "templates/index.html" }
+    { "src": "/(.*)", "dest": "index.html" }
   ]
 }
