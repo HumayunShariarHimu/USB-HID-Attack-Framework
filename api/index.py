@@ -5,7 +5,6 @@ import os
 app = Flask(__name__, static_folder='../static', template_folder='../templates')
 CORS(app)
 
-# ৬৭+ পেলোডের তালিকা (ফ্রন্টএন্ডের সাথে সিঙ্ক)
 PAYLOADS = [
     "reverse_tcp", "reverse_https", "bind_tcp", "msf_stager",
     "linux_reverse", "linux_bind", "python_reverse",
